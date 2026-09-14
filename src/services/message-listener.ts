@@ -12,6 +12,7 @@ export interface MessageListenerMatch {
   replyCardTitle?: string;
   prompt: string;
   workingDir?: string;
+  replyMode: 'thread' | 'chat';
   messageText: string;
   messageTitle?: string;
   msgType: string;
@@ -319,6 +320,7 @@ export function evaluateMessageListener(input: {
     replyCardTitle: listener.replyCardTitle,
     prompt: listener.prompt,
     workingDir: listener.workingDir,
+    replyMode: listener.replyPolicy?.mode === 'chat' ? 'chat' : 'thread',
     messageText,
     messageTitle,
     msgType,

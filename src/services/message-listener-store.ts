@@ -10,6 +10,7 @@ export type MessageListenerUpdate = {
   senderPolicy?: MessageListenerConfig['senderPolicy'];
   messagePolicy?: MessageListenerConfig['messagePolicy'];
   contentPolicy?: MessageListenerConfig['contentPolicy'];
+  replyPolicy?: MessageListenerConfig['replyPolicy'];
 };
 
 function stringList(raw: unknown): string[] | undefined {
@@ -82,6 +83,9 @@ export function sanitizeMessageListenerUpdate(raw: unknown): MessageListenerUpda
     ? entry.contentPolicy as Record<string, unknown>
     : undefined;
   let contentPolicy: MessageListenerConfig['contentPolicy'];
+  const rawReply = entry.replyPolicy && typeof entry.replyPolicy === 'object' && !Array.isArray(entry.replyPolicy)
+    ? entry.replyPolicy as Record<string, unknown>
+    : {};
   if (rawContent) {
     const includeKeywords = stringList(rawContent.includeKeywords);
     // V1 is keyword-substring only (no regexes on the daemon main loop — see
@@ -103,6 +107,7 @@ export function sanitizeMessageListenerUpdate(raw: unknown): MessageListenerUpda
     ...(Object.keys(senderPolicy).length > 0 ? { senderPolicy } : {}),
     messagePolicy,
     ...(contentPolicy ? { contentPolicy } : {}),
+    ...(rawReply.mode === 'chat' ? { replyPolicy: { mode: 'chat', sessionMode: 'per_message' } } : {}),
   };
 }
 
@@ -153,7 +158,7 @@ export function messageListenerConfigFromUpdate(patch: MessageListenerUpdate): M
     ...(patch.senderPolicy && Object.keys(patch.senderPolicy).length > 0 ? { senderPolicy: patch.senderPolicy } : {}),
     ...(patch.messagePolicy ? { messagePolicy: { ...patch.messagePolicy, scope: 'top_level' } } : { messagePolicy: { scope: 'top_level' } }),
     ...(patch.contentPolicy ? { contentPolicy: patch.contentPolicy } : {}),
-    replyPolicy: { mode: 'thread', sessionMode: 'per_message' },
+    replyPolicy: { mode: patch.replyPolicy?.mode === 'chat' ? 'chat' : 'thread', sessionMode: 'per_message' },
   };
 }
 

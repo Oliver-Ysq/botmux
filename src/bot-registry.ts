@@ -259,8 +259,8 @@ export interface MessageListenerConfig {
     matchMode?: 'any' | 'all';
   };
   replyPolicy?: {
-    /** V1 always replies under the triggering message. */
-    mode?: 'thread';
+    /** `thread` replies under the triggering message; `chat` posts at group top level. */
+    mode?: 'thread' | 'chat';
     /** V1 starts one session per matched message. */
     sessionMode?: 'per_message';
   };
@@ -1161,7 +1161,12 @@ function normalizeMessageListenerConfig(raw: unknown, botIndex: number, chatId: 
     ...(Object.keys(senderPolicy).length > 0 ? { senderPolicy } : {}),
     ...(Object.keys(messagePolicy).length > 0 ? { messagePolicy } : {}),
     ...(contentPolicy ? { contentPolicy } : {}),
-    replyPolicy: { mode: 'thread', sessionMode: 'per_message' },
+    replyPolicy: {
+      mode: entry.replyPolicy && typeof entry.replyPolicy === 'object' && (entry.replyPolicy as Record<string, unknown>).mode === 'chat'
+        ? 'chat'
+        : 'thread',
+      sessionMode: 'per_message',
+    },
   };
 }
 

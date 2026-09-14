@@ -147,6 +147,7 @@ function cloneListener(listener: MessageListenerData | null | undefined): Messag
       includeMsgTypes: [...(listener?.messagePolicy?.includeMsgTypes ?? DEFAULT_LISTENER.messagePolicy?.includeMsgTypes ?? [])],
       scope: 'top_level',
     },
+    replyPolicy: { mode: listener?.replyPolicy?.mode === 'chat' ? 'chat' : 'thread', sessionMode: 'per_message' },
     ...(listener?.contentPolicy ? {
       contentPolicy: {
         ...(listener.contentPolicy.includeKeywords ? { includeKeywords: [...listener.contentPolicy.includeKeywords] } : {}),
@@ -757,6 +758,7 @@ function RolesPage(props: { tab: RolesTab }) {
         scope: 'top_level',
       },
       ...(contentPolicy ? { contentPolicy } : {}),
+      replyPolicy: { mode: editingListener.replyPolicy?.mode === 'chat' ? 'chat' : 'thread', sessionMode: 'per_message' },
     };
   }
 
@@ -1700,6 +1702,17 @@ function MessageListenerEditor(props: {
           />
         </label>
       </div>
+      <label className="roles-listener-field" style={{ maxWidth: 320 }}>
+        <span className="roles-field-label">{tr('roles.listenerReplyPlacement')}</span>
+        <select
+          value={listener.replyPolicy?.mode === 'chat' ? 'chat' : 'thread'}
+          onChange={ev => props.onPatch({ replyPolicy: { mode: ev.currentTarget.value === 'chat' ? 'chat' : 'thread', sessionMode: 'per_message' } })}
+        >
+          <option value="thread">{tr('roles.listenerReplyPlacementThread')}</option>
+          <option value="chat">{tr('roles.listenerReplyPlacementChat')}</option>
+        </select>
+        <small className="roles-listener-scope-help">{tr('roles.listenerReplyPlacementHelp')}</small>
+      </label>
       <div className="roles-listener-policy-row">
         <div className="roles-listener-policy">
           <div className="roles-field-label">{tr('roles.listenerSenderTypes')}</div>
