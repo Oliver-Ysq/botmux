@@ -4581,11 +4581,12 @@ let codexBridgeBaselineDone = false;
 let publishedActiveRuntime: TraexRuntimeSnapshot = {};
 let activeRuntimePublished = false;
 const codexBridgeQueue = new CodexBridgeQueue();
-// Codex CoT: rollout reasoning/tool events attributed to the collecting turn
-// feed the same thinking channel as Claude's transcript attribution. Other
-// structured bridges (traex/cursor/pi/…) never emit 'cot' events, so this
-// observer is inert for them. Local (adopt) turns are skipped for the same
-// reason as Claude's: no Lark turn to anchor the bubble to.
+// Structured rollout CoT: Codex response items and TraeX history mutations emit
+// rollout reasoning/tool events attributed to the collecting turn, feeding
+// the same thinking channel as Claude's transcript attribution. Other
+// structured bridges (cursor/pi/…) never emit 'cot' events, so this observer
+// is inert for them. Local (adopt) turns are skipped for the same reason as
+// Claude's: no Lark turn to anchor the bubble to.
 codexBridgeQueue.setCotObserver((entries, turn) => {
   if (turn.isLocal) return;
   observeCotEntries(entries, turn);
@@ -14608,6 +14609,7 @@ async function spawnCli(
     // plain-TUI launch doesn't wedge on codex 0.14x's "Press t to trust" gate.
     // The adapter further ANDs this with !disableCliBypass. Read live per spawn.
     bypassHookTrust: config.bypassCodexHookTrust,
+    hideRateLimitModelNudge: config.hideCodexRateLimitModelNudge,
     skillPluginDir: cfg.skillPluginDir,
     // Per-bot CODEX_HOME can be enabled without the OS sandbox. Only the latter
     // needs Codex's read-isolation shell-env behavior.
