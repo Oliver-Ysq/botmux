@@ -94,12 +94,12 @@ function sameStringList(a: readonly string[], b: readonly string[]): boolean {
   return a.length === b.length && a.every((value, index) => value === b[index]);
 }
 
-type FlashState = { text: string; isError?: boolean; id: number } | null;
+export type FlashState = { text: string; isError?: boolean; id: number } | null;
 type ApplyStatus =
   | { kind: 'idle' }
   | { kind: 'text'; text: string }
   | { kind: 'results'; preview: boolean; results: RoleProfileApplyResult[] };
-type ListenerPreviewStatus =
+export type ListenerPreviewStatus =
   | { kind: 'idle' }
   | { kind: 'loading'; mode: 'preview' | 'run' }
   | { kind: 'result'; response: MessageListenerPreviewResponse; mode: 'preview' | 'run' }
@@ -119,7 +119,7 @@ const DEFAULT_LISTENER: MessageListenerData = {
   },
 };
 
-function cloneListener(listener: MessageListenerData | null | undefined): MessageListenerData {
+export function cloneListener(listener: MessageListenerData | null | undefined): MessageListenerData {
   // Mirror the backend storage default: persisted configs OMIT `mode` when it
   // equals 'all_except_excluded' (see message-listener-store sanitize +
   // bot-registry normalize), so an ABSENT mode means all_except_excluded, NOT
@@ -1149,14 +1149,6 @@ function RolesPage(props: { tab: RolesTab }) {
                 >
                   {tr('roles.roleTab')}
                 </button>
-                <button
-                  type="button"
-                  className={groupEditorSection === 'listener' ? 'active' : ''}
-                  aria-pressed={groupEditorSection === 'listener'}
-                  onClick={() => setGroupEditorSection('listener')}
-                >
-                  {tr('roles.listenerTab')}
-                </button>
               </div>
               {groupEditorSection === 'role' ? (
                 <>
@@ -1548,7 +1540,7 @@ function GroupProfileStatus(props: {
   );
 }
 
-function MessageListenerEditor(props: {
+export function MessageListenerEditor(props: {
   listener: MessageListenerData;
   members: GroupMemberDisplay[];
   memberById: Map<string, GroupMemberDisplay>;
@@ -1702,17 +1694,19 @@ function MessageListenerEditor(props: {
           />
         </label>
       </div>
-      <label className="roles-listener-field" style={{ maxWidth: 320 }}>
-        <span className="roles-field-label">{tr('roles.listenerReplyPlacement')}</span>
-        <select
-          value={listener.replyPolicy?.mode === 'chat' ? 'chat' : 'thread'}
-          onChange={ev => props.onPatch({ replyPolicy: { mode: ev.currentTarget.value === 'chat' ? 'chat' : 'thread', sessionMode: 'per_message' } })}
-        >
-          <option value="thread">{tr('roles.listenerReplyPlacementThread')}</option>
-          <option value="chat">{tr('roles.listenerReplyPlacementChat')}</option>
-        </select>
-        <small className="roles-listener-scope-help">{tr('roles.listenerReplyPlacementHelp')}</small>
-      </label>
+      <div className="roles-listener-reply-placement">
+        <label className="roles-listener-field" style={{ maxWidth: 320 }}>
+          <span className="roles-field-label">{tr('roles.listenerReplyPlacement')}</span>
+          <select
+            value={listener.replyPolicy?.mode === 'chat' ? 'chat' : 'thread'}
+            onChange={ev => props.onPatch({ replyPolicy: { mode: ev.currentTarget.value === 'chat' ? 'chat' : 'thread', sessionMode: 'per_message' } })}
+          >
+            <option value="thread">{tr('roles.listenerReplyPlacementThread')}</option>
+            <option value="chat">{tr('roles.listenerReplyPlacementChat')}</option>
+          </select>
+        </label>
+        <small className="roles-listener-reply-placement-help">{tr('roles.listenerReplyPlacementHelp')}</small>
+      </div>
       <div className="roles-listener-policy-row">
         <div className="roles-listener-policy">
           <div className="roles-field-label">{tr('roles.listenerSenderTypes')}</div>
