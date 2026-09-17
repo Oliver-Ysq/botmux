@@ -2359,6 +2359,7 @@ function listenerRoutingContext(input: {
       larkAppId: input.larkAppId,
       scope: replyInChat ? 'chat' : 'thread',
       anchor: replyInChat ? input.chatId : input.messageId,
+      regularGroupTopLevel: replyInChat,
       messageListener: input.match,
     },
     ownsSession: false,
@@ -2387,9 +2388,16 @@ function enabledMessageListenerChatIds(bot: BotState): string[] {
   // backfill needs concrete chat ids, so callers provide the configured
   // exception set here; joined chats without an exception are still covered by
   // realtime delivery and are discovered by the dashboard group list.
-  return Object.entries(bot.config.groupMessageListenerOverrides ?? {})
+  const customChatIds = Object.entries(bot.config.groupMessageListenerOverrides ?? {})
     .filter(([, override]) => override?.mode === 'custom' && override.listener.enabled === true && !!override.listener.prompt?.trim())
     .map(([chatId]) => chatId);
+  // Keep legacy-only configurations pollable during the rolling migration.
+  // bot-registry exposes this compatibility view specifically for callers that
+  // have not yet been converted to groupMessageListenerOverrides.
+  const legacyChatIds = Object.entries(bot.config.messageListeners ?? {})
+    .filter(([, listener]) => listener?.enabled === true && !!listener.prompt?.trim())
+    .map(([chatId]) => chatId);
+  return [...new Set([...customChatIds, ...legacyChatIds])];
 }
 
 function messageCreateTimeMs(message: any): number | undefined {
@@ -2499,9 +2507,20 @@ async function dispatchPolledMessageListenerMatch(input: {
 
 async function pollMessageListenersOnce(larkAppId: string, handlers: EventHandlers, now = Date.now()): Promise<void> {
   const bot = getBot(larkAppId);
-  const chatIds = bot.config.globalMessageListener?.enabled
-    ? (await listChats(larkAppId)).map(chat => chat.chatId)
-    : enabledMessageListenerChatIds(bot);
+  const configuredChatIds = enabledMessageListenerChatIds(bot);
+  let chatIds = configuredChatIds;
+  if (bot.config.globalMessageListener?.enabled) {
+    try {
+      chatIds = [...new Set([...(await listChats(larkAppId)).map(chat => chat.chatId), ...configuredChatIds])];
+    } catch (error) {
+      // A transient roster failure must not suppress custom/legacy listener
+      // backfill for the whole 30s pass. Realtime delivery stays unaffected.
+      logger.warn(
+        `[message-listener:${larkAppId}] list joined chats failed; polling configured listener chats only: `
+        + `${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
   if (chatIds.length === 0) return;
 
   const cutoff = now - MESSAGE_LISTENER_BACKFILL_WINDOW_MS;

@@ -20606,6 +20606,15 @@ async function handleThreadReplyAdmitted(
   const parsedResult = prepared ?? parseEventMessage(data);
   const parsed = parsedResult.parsed;
   const resources = parsedResult.resources;
+  // A listener may use chat scope and therefore arrive through an existing
+  // session's reply path after its first match. It must retain the same
+  // untrusted wrapper as the new-topic path; otherwise its raw text can reach
+  // the passthrough slash-command lane of the resident CLI session.
+  if (ctx.messageListener) {
+    refreshListenerCardTextFromResolved(ctx.messageListener, data.message);
+    const listenerPrompt = renderMessageListenerPrompt(ctx.messageListener);
+    parsed.content = listenerPrompt;
+  }
 
   // Expand merge_forward: fetch sub-messages and collect their resources
   if (!prepared && parsed.msgType === 'merge_forward') {
@@ -20907,7 +20916,9 @@ async function handleThreadReplyAdmitted(
   // acceptSlashFromBots gate (mirror of the new-topic path): a bot sender's
   // slash is only routed as a command when this bot opts in (default on); when
   // off it falls through to ordinary message handling. Human senders unaffected.
-  const invocation = ((isBotSenderType || isForeignBot) && !botAcceptsSlashFromBots(larkAppId))
+  const invocation = ctx.messageListener
+    ? null
+    : ((isBotSenderType || isForeignBot) && !botAcceptsSlashFromBots(larkAppId))
     ? null
     : parseSlashCommandInvocation(cmdContent);
   if (invocation) {
