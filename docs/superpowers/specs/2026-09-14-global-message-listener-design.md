@@ -4,7 +4,7 @@
 
 将群消息监听从「角色管理」中的群级编辑能力提升为「数字员工 > 消息监听」独立入口，按 Bot 管理。每个 Bot 可以配置一套默认的全局消息监听规则；该规则默认对 Bot 当前加入的所有群生效。群级设置只负责声明例外：继承全局、关闭监听或使用完整的自定义规则。
 
-本设计以提交 `b981be10` 为基线，必须保留其中新增的回复位置能力：监听命中后既可以在原消息下创建话题，也可以直接发到群聊顶层。
+本设计必须保留监听的回复位置能力：监听命中后既可以在原消息下创建话题，也可以直接发到群聊顶层。
 
 ## 已确认的产品规则
 
@@ -91,7 +91,7 @@ interface BotConfig {
 - 旧 `messageListeners[chatId]` 迁为 `groupMessageListenerOverrides[chatId] = { mode: 'custom', listener }`；
 - 新 `globalMessageListener` 初始为空或关闭；
 - 成功迁移后删除旧字段；
-- 历史规则未携带 `replyPolicy` 时默认 `thread`，保证与 `b981be10` 前的行为一致。
+- 历史规则未携带 `replyPolicy` 时默认 `thread`，保证与既有行为一致。
 
 需要保证 registry 的规范化、Dashboard API 写入、配置持久化和运行时读取共同支持新旧形态；对格式异常的覆写或规则 fail-closed，跳过监听并记录可诊断日志。
 
@@ -140,7 +140,7 @@ GET/PUT /api/message-listeners/:botId/groups/:chatId
 
 - WS 实时事件和历史轮询补偿对同一有效规则产生相同命中结果。
 - 发送者、消息类型、关键词、任一/全部匹配和排除自身语义保持不变。
-- `thread` 和 `chat` 两种回复位置沿用 `b981be10` 的锚点与会话语义。
+- `thread` 和 `chat` 两种回复位置保持既有的锚点与会话语义。
 - disabled 不产生会话、轮询唤醒或回复；custom 不受全局开关和后续全局修改影响。
 
 ### Dashboard 测试
