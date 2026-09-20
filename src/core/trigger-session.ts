@@ -284,7 +284,7 @@ export function resolveIdempotencyHit(
   // legitimate own record, and an unstamped legacy record is correctly not
   // trusted (a new idempotency turn has no unstamped evidence of its own).
   const asyncRec = asyncTriggerStore.lookup(hit.sessionId, hit.triggerId);
-  let ownedOutcome: 'pending' | 'completed' | 'failed' | undefined;
+  let ownedOutcome: 'pending' | 'completed' | 'failed' | 'interrupted' | undefined;
   if (asyncRec) {
     if (asyncRec.ownerLarkAppId === hit.ownerLarkAppId) {
       ownedOutcome = asyncRec.result.status;
@@ -298,6 +298,9 @@ export function resolveIdempotencyHit(
   }
   if (ownedOutcome === 'failed') {
     return { kind: 'terminal', chatId, message: 'previous dispatch outcome is unknown (ambiguous crash); not re-run (at-most-once)' };
+  }
+  if (ownedOutcome === 'interrupted') {
+    return { kind: 'terminal', chatId, message: 'previous dispatch was interrupted; not re-run under the same idempotency key' };
   }
   if (hit.state === 'attempting') {
     // Ground truth for "genuinely in flight" is a LIVE WORKER, not registry
