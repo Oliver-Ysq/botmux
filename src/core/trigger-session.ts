@@ -405,7 +405,7 @@ export async function reconcileIdempotencyLeasesOnBoot(
       try {
         const asyncRec = asyncTriggerStore.lookup(record.sessionId, record.triggerId);
         const outcome = (asyncRec && asyncRec.ownerLarkAppId === ownerLarkAppId) ? asyncRec.result.status : undefined;
-        if (outcome === 'completed' || outcome === 'failed') continue; // already durable-terminal
+        if (outcome === 'completed' || outcome === 'failed' || outcome === 'interrupted') continue; // already durable-terminal
         if (record.state === 'attempting') {
           terminalizeAttempting(record); // durable dispatch_unknown; throws on real I/O failure
           continue;
@@ -439,7 +439,10 @@ export async function reconcileIdempotencyLeasesOnBoot(
       if (asyncRec && asyncRec.ownerLarkAppId !== ownerLarkAppId) {
         logger.warn(`[idempotency] reconcile ignoring foreign async evidence for ${record.sessionId}/${record.triggerId}: record owner=${asyncRec.ownerLarkAppId ?? '(unstamped)'} != ${ownerLarkAppId}`);
       }
-      if (outcome === 'completed') continue; // converged good; retry reuses + polls
+      // An explicit interrupt is a successful terminal of THIS exact turn. It
+      // deliberately leaves the fresh session usable, just like completed, so
+      // boot reconcile must not quarantine/close it after a daemon restart.
+      if (outcome === 'completed' || outcome === 'interrupted') continue;
       if (outcome === 'failed') {
         // Already durable-failed, but a PREVIOUS boot may have crashed after
         // writing failed and before closing → always re-quarantine and re-attempt

@@ -9360,7 +9360,15 @@ async function handleExactTurnInterrupt(requestId: string, turnId: string): Prom
     send({ type: 'turn_interrupt_result', requestId, turnId, delivered: false, reason: 'stale_turn' });
     return;
   }
-  if (effectiveBackendType === 'riff' || effectiveBackendType === 'mojo' || !backend) {
+  // Codex App and codexRpcInput use the pane as a viewer while actual work is
+  // driven through app-server/RPC. Writing ETX here would kill that transport
+  // process, not safely interrupt the exact model turn. Match the card stop
+  // contract and fail closed until their native turn-interrupt protocol exists.
+  if (lastInitConfig?.cliId === 'codex-app'
+      || lastInitConfig?.codexRpcInput === true
+      || effectiveBackendType === 'riff'
+      || effectiveBackendType === 'mojo'
+      || !backend) {
     send({ type: 'turn_interrupt_result', requestId, turnId, delivered: false, reason: 'unsupported' });
     return;
   }
