@@ -18,6 +18,6 @@
     "declarationMap": false,
     "sourceMap": false
   },
-  "include": ["scripts/**/*.ts", "scripts/**/*.tsx"],
+  "include": ["scripts/**/*.ts", "scripts/**/*.tsx", "src/types/**/*.d.ts"],
   "exclude": ["node_modules", "dist"]
 }
