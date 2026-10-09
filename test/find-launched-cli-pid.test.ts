@@ -81,7 +81,9 @@ describe('worker wrapper PID wiring', () => {
   it.each([false, true])('keeps the wrapper bridge resolver off under sandbox while the codex bwrap resolver runs (late=%s)', late => {
     const result = runWorkerWiring(late, { sandboxRequested: true });
     expect(result.bridgeCliPid).toBeUndefined();
+    expect(result.findLaunchedCliPid).toHaveBeenCalledWith(100, 'codex');
     expect(result.backend.cliPid).toBe(200);
+    expect(result.publishLocalProcessAttestation).toHaveBeenLastCalledWith(200);
   });
 });
 
