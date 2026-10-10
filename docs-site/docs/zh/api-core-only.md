@@ -225,7 +225,7 @@ core-only 是「无飞书出站通道 + 单租户 loopback」，围绕这点有�
 - **无飞书 Client**：apiOnly bot 根本不构造 `Lark.Client`，`larkAppSecret` 对 worker **withheld**（不注入子进程环境）。
 - **配置权威**：忽略 `~/.botmux/bots.json` 与 `BOTS_CONFIG`，且入口**删除** `process.env.BOTS_CONFIG`——避免 fork 出的 worker 里 agent `cat $BOTS_CONFIG` 读到真实 fleet 的 sibling 凭证。
 - **状态隔离**：入口**冻结** `SESSION_DATA_DIR` 到专用 `~/.botmux/core-only/<botId>/data`——一个把 host 的 `SESSION_DATA_DIR` 带进来的 managed turn 无法让 core-only 去读真实 fleet 的会话/pid/descriptor。
-- **宿主密钥隔离**：core-only 的 dispatch-report 签名密钥保存在专用 `SESSION_DATA_DIR` 内；显式 `--state-dir` 不会把密钥写入其父目录，也不会读取同 HOME fleet 的共享签名密钥。
+- **宿主密钥隔离**：core-only 的 dispatch-report 签名密钥保存在专用 `SESSION_DATA_DIR` 内；显式 `--state-dir` 不会把新密钥写入其父目录，也不会读取同 HOME fleet 的共享签名密钥。为兼容历史 core-only 状态，仅当旧位置的叶子存在且通过严格宿主凭证校验时才迁移；缺失时直接在 state-dir 创建新密钥，不安全旧叶子则 fail closed。
 - **loopback 冻结**：`BOTMUX_WORKER_HTTP_HOST` 与 `WEB_EXTERNAL_HOST` 都被冻结成 `127.0.0.1`（bind 与广告 host 一致），worker web server 不会暴露在所有网卡上。
 - **跳过 host 维护**：core-only 不跑 fleet 级的 auto-restart / `botmux restart` / 共享 HOME breadcrumb 写入，绝不触碰同机的全局 botmux 安装。
 - **鉴权仍是硬门**：loopback 只是连通性不是身份——同机（含 bwrap 沙箱，默认共享网络命名空间）的进程也能拨 `127.0.0.1`。所以除 §3 第一层的三条控制路由 + `/healthz`/`/__health` 外，其余路由都要鉴权：第二层由 handler 内的 per-session capability / 独立强签名验证，第三层 host/operator 路由要 §4 的 route+port-bound HMAC。没有任何一层是「裸 loopback 就放行」。
