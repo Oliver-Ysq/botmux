@@ -773,6 +773,15 @@ describe('core-only entrypoint hardening (codex 4 P1s — source lock)', () => {
     expect(ipcSource).toContain('opts.coreOnlyPublicRoutes === true && routeIsCoreOnlyPublic(method, url.pathname)');
   });
 
+  it('host-facts fails closed unless the owned session is apiOnly and HTTP-virtual', () => {
+    const handler = region(ipcSource, "ipcRoute('GET', '/api/sessions/:sessionId/host-facts'", "ipcRoute('POST', '/api/sessions/:sessionId/trigger-result/supersede'");
+    expect(handler).toContain('session.larkAppId !== cachedLarkAppId');
+    expect(handler).toContain('getBot(cachedLarkAppId).config.apiOnly === true');
+    expect(handler).toContain('!apiOnly || !isHttpVirtualSession(session.chatId)');
+    expect(handler.match(/jsonRes\(res, 404, \{ ok: false, error: 'session_not_found' \}\)/g)?.length).toBeGreaterThanOrEqual(2);
+    expect(handler).toContain("backingProbe = 'unknown'");
+  });
+
   it('P1-2: core-only skips fleet sandbox migration + synthesis ignores ambient BOTS_CONFIG', () => {
     // Migration reads/backs-up/rewrites the on-disk fleet bots.json — must not run
     // for a headless core-only service.

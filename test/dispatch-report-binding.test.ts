@@ -35,6 +35,21 @@ describe('dispatch report binding secret path', () => {
       .toBe(join(stateDir, '.dashboard-secret.report-binding'));
   });
 
+  it('creates the in-state secret when a legacy leaf is absent below a sticky shared parent', () => {
+    const root = `/tmp/botmux-binding-sticky-${crypto.randomUUID()}`;
+    const stateDir = join(root, 'state');
+    mkdirSync(stateDir, { recursive: true, mode: 0o700 });
+    chmodSync(root, 0o1777); chmodSync(stateDir, 0o700);
+    const current = join(stateDir, '.dashboard-secret.report-binding');
+    const legacy = join(root, '.dashboard-secret.report-binding');
+    try {
+      const secret = loadOrCreateDispatchReportBindingSecret(stateDir, { coreOnly: true });
+      expect(secret).toHaveLength(43);
+      expect(readFileSync(current, 'utf8')).toBe(secret);
+      expect(existsSync(legacy)).toBe(false);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+
   it('migrates a secure legacy core-only secret into the new state directory', () => {
     const root = `/tmp/botmux-binding-migrate-${crypto.randomUUID()}`;
     const stateDir = join(root, 'data');
@@ -58,6 +73,21 @@ describe('dispatch report binding secret path', () => {
     try {
       expect(() => loadOrCreateDispatchReportBindingSecret(stateDir, { coreOnly: true })).toThrow('权限必须严格为 0600');
       expect(existsSync(join(stateDir, '.dashboard-secret.report-binding'))).toBe(false);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+
+  it('refuses a present legacy secret below a sticky shared parent instead of switching signature domains', () => {
+    const root = `/tmp/botmux-binding-sticky-legacy-${crypto.randomUUID()}`;
+    const stateDir = join(root, 'state');
+    mkdirSync(stateDir, { recursive: true, mode: 0o700 });
+    chmodSync(root, 0o1777); chmodSync(stateDir, 0o700);
+    const legacy = join(root, '.dashboard-secret.report-binding');
+    const current = join(stateDir, '.dashboard-secret.report-binding');
+    writeFileSync(legacy, 'legacy-secret', { mode: 0o600 }); chmodSync(legacy, 0o600);
+    try {
+      expect(() => loadOrCreateDispatchReportBindingSecret(stateDir, { coreOnly: true }))
+        .toThrow('宿主凭证目录可被组内或其它用户写入');
+      expect(existsSync(current)).toBe(false);
     } finally { rmSync(root, { recursive: true, force: true }); }
   });
 });

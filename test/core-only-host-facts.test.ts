@@ -15,11 +15,19 @@ describe('core-only host facts', () => {
       workerGeneration: 3,
       backingProbe: 'unknown',
     });
-    expect(facts.liveness).toBe('unknown');
-    expect(facts.native).toEqual({
-      sessionId: 'thread-1',
-      activeTurnId: 'turn-logical',
-      nativeTurnId: null,
+    expect(facts).toEqual({
+      protocolVersion: 1,
+      sessionId: 'session-1',
+      cli: 'codex',
+      backend: 'tmux',
+      sessionStatus: 'active',
+      liveness: 'unknown',
+      worker: { present: true, ready: true, generation: 3 },
+      native: {
+        sessionId: 'thread-1',
+        activeTurnId: 'turn-logical',
+        nativeTurnId: null,
+      },
     });
   });
 
@@ -54,5 +62,22 @@ describe('core-only host facts', () => {
       backingProbe: null,
     });
     expect(facts.liveness).toBe('unknown');
+  });
+
+  it('does not call a present but unready worker alive', () => {
+    const facts = projectCoreOnlyHostFacts({
+      sessionId: 'session-4',
+      sessionStatus: 'active',
+      cli: 'codex',
+      backend: 'pty',
+      nativeSessionId: null,
+      activeTurnId: null,
+      workerPresent: true,
+      workerReady: false,
+      workerGeneration: 4,
+      backingProbe: null,
+    });
+    expect(facts.liveness).toBe('unknown');
+    expect(facts.worker).toEqual({ present: true, ready: false, generation: 4 });
   });
 });

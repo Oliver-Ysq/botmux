@@ -1,4 +1,5 @@
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
+import { lstatSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { readSecureHostFileSync, withSecureHostParentSync } from '../platform/secure-host-file.js';
 
@@ -62,10 +63,25 @@ export function loadOrCreateDispatchReportBindingSecret(
 
     if (coreOnly) {
       const legacyPath = join(dirname(dataDir), '.dashboard-secret.report-binding');
-      const legacy = readSecureHostFileSync(legacyPath, 256)?.trim();
-      if (legacy) {
-        parent.writeLeaf(legacy);
-        return legacy;
+      // Do not run the strict legacy-parent check merely to discover a missing
+      // leaf. An explicit state dir may be a direct child of sticky /tmp: that
+      // parent is intentionally unsuitable for a credential, but its absence
+      // must not prevent a new credential from being created inside stateDir.
+      // If the legacy leaf exists, keep the strict reader: a symlink, unsafe
+      // mode, or untrusted parent is an ambiguous authority and fails closed.
+      let legacyPresent = false;
+      try {
+        lstatSync(legacyPath);
+        legacyPresent = true;
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
+      }
+      if (legacyPresent) {
+        const legacy = readSecureHostFileSync(legacyPath, 256)?.trim();
+        if (legacy) {
+          parent.writeLeaf(legacy);
+          return legacy;
+        }
       }
     }
 
