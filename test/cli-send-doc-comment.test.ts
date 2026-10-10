@@ -273,13 +273,13 @@ describe('real CLI document-comment reply routing', () => {
     expect(result.sends).toEqual([]);
   }, 35_000);
 
-  it('leaves an ordinary chat on the chat interface even with an older pending comment', () => {
+  it('uses the ordinary chat turn reply interface even with an older pending comment', () => {
     const result = runSend({
       markerTurn: 'om_chat_turn', mentionBack: false, session: { chatId: 'oc_chat' },
     });
     expect(result.status, result.stderr).toBe(0);
     expect(result.requests).toHaveLength(1);
-    expect(result.requests[0]?.path).toBe('/open-apis/im/v1/messages');
-    expect(result.requests[0]?.body.receive_id).toBe('oc_chat');
+    expect(result.requests[0]?.path).toBe('/open-apis/im/v1/messages/om_chat_turn/reply');
+    expect(result.requests[0]?.body.receive_id).toBeUndefined();
   }, 35_000);
 });
