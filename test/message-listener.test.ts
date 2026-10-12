@@ -45,6 +45,26 @@ function interactiveMessage(overrides: Record<string, unknown> = {}) {
 }
 
 describe('message listener evaluation', () => {
+  it('matches a rich-post title and link label without inventing a document message type', () => {
+    const state = bot({ globalMessageListener: {
+      enabled: true, prompt: 'listener',
+      senderPolicy: { includeSenderOpenIds: ['ou_allowed'], includeSenderTypes: ['user'] },
+      messagePolicy: { includeMsgTypes: ['post'], scope: 'top_level' },
+      contentPolicy: { includeKeywords: ['智能纪要'] },
+    }});
+    const message = textMessage({
+      message_type: 'post',
+      content: JSON.stringify({ title: '会议资料', content: [[{ tag: 'a', text: '智能纪要：测试会议', href: 'https://example.feishu.cn/docx/DEMO_TOKEN' }]] }),
+    });
+    const match = evaluateMessageListener({ bot: state, chatId: 'oc_chat', message, senderOpenId: 'ou_allowed', senderTypeRaw: 'user', explicitlyMentionedThisBot: false });
+    expect(match?.msgType).toBe('post');
+    expect(match?.messageText).toBe('会议资料\n智能纪要：测试会议 (https://example.feishu.cn/docx/DEMO_TOKEN)');
+  });
+
+  it('separates post title and body for keyword matching', () => {
+    expect(extractListenerMessageText(textMessage({ message_type: 'post', content: JSON.stringify({ title: '智能', content: [[{ tag: 'text', text: '纪要' }]] }) }))).toBe('智能\n纪要');
+  });
+
   it('matches enabled top-level non-mention messages after deterministic filters', () => {
     const state = bot({
       messageListeners: {
