@@ -81,6 +81,9 @@ describe('message listener evaluation', () => {
     await expect(evaluateMessageListenerWithDocumentTitles({
       bot: documentTitleListener(), chatId: 'oc_chat', message: textMessage(), senderOpenId: 'ou_allowed', senderTypeRaw: 'user', explicitlyMentionedThisBot: true,
     }, { resolveDocumentTitles })).resolves.toBeUndefined();
+    await expect(evaluateMessageListenerWithDocumentTitles({
+      bot: documentTitleListener(), chatId: 'oc_chat', message: interactiveMessage(), senderOpenId: 'ou_allowed', senderTypeRaw: 'user', explicitlyMentionedThisBot: false,
+    }, { resolveDocumentTitles })).resolves.toBeUndefined();
     expect(resolveDocumentTitles).not.toHaveBeenCalled();
   });
 
@@ -92,6 +95,16 @@ describe('message listener evaluation', () => {
     await expect(evaluateMessageListenerWithDocumentTitles({
       bot: documentTitleListener(), chatId: 'oc_chat', message, senderOpenId: 'ou_allowed', senderTypeRaw: 'user', explicitlyMentionedThisBot: false,
     }, { resolveDocumentTitles: async () => { throw new Error('forbidden'); } })).resolves.toBeUndefined();
+  });
+
+  it('applies all-mode across local text and resolved document titles', async () => {
+    const message = textMessage({ content: JSON.stringify({ text: '会议链接 https://bytedance.feishu.cn/docx/DocToken1234567890AbCd' }) });
+    await expect(evaluateMessageListenerWithDocumentTitles({
+      bot: documentTitleListener({ includeKeywords: ['会议', '智能纪要'], matchMode: 'all' }), chatId: 'oc_chat', message, senderOpenId: 'ou_allowed', senderTypeRaw: 'user', explicitlyMentionedThisBot: false,
+    }, { resolveDocumentTitles: async () => ['智能纪要：测试会议'] })).resolves.toMatchObject({ msgType: 'text' });
+    await expect(evaluateMessageListenerWithDocumentTitles({
+      bot: documentTitleListener({ includeKeywords: ['会议', '不存在'], matchMode: 'all' }), chatId: 'oc_chat', message, senderOpenId: 'ou_allowed', senderTypeRaw: 'user', explicitlyMentionedThisBot: false,
+    }, { resolveDocumentTitles: async () => ['智能纪要：测试会议'] })).resolves.toBeUndefined();
   });
 
   it('matches a rich-post title and link label without inventing a document message type', () => {
