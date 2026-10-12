@@ -1,7 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   MAX_MESSAGE_LISTENER_PROMPT_BYTES,
   evaluateMessageListener,
+  evaluateMessageListenerWithDocumentTitles,
   extractListenerMessageText,
   extractListenerMessageTitle,
   normalizeMessageListenerPreviewLimit,
@@ -45,6 +46,54 @@ function interactiveMessage(overrides: Record<string, unknown> = {}) {
 }
 
 describe('message listener evaluation', () => {
+  function documentTitleListener(policy: Record<string, unknown> = {}) {
+    return bot({ globalMessageListener: {
+      enabled: true,
+      prompt: 'listener',
+      senderPolicy: { mode: 'include_only', includeSenderOpenIds: ['ou_allowed'], includeSenderTypes: ['user'] },
+      messagePolicy: { includeMsgTypes: ['text', 'post'], scope: 'top_level' },
+      contentPolicy: { includeKeywords: ['智能纪要'], resolveDocumentTitles: true, ...policy },
+    }});
+  }
+
+  it('matches a custom post link when only its resolved document title contains the keyword', async () => {
+    const resolveDocumentTitles = vi.fn(async () => ['智能纪要：测试会议']);
+    const message = textMessage({
+      message_type: 'post',
+      content: JSON.stringify({ content: [[{ tag: 'a', text: '点击查看', href: 'https://bytedance.feishu.cn/docx/DocToken1234567890AbCd' }]] }),
+    });
+    const match = await evaluateMessageListenerWithDocumentTitles({
+      bot: documentTitleListener(), chatId: 'oc_chat', message, senderOpenId: 'ou_allowed', senderTypeRaw: 'user', explicitlyMentionedThisBot: false,
+    }, { resolveDocumentTitles });
+    expect(resolveDocumentTitles).toHaveBeenCalledTimes(1);
+    expect(match?.messageText).toContain('文档标题：智能纪要：测试会议');
+  });
+
+  it('does not query titles when the local message already matches or a gate rejects it', async () => {
+    const resolveDocumentTitles = vi.fn(async () => ['智能纪要：测试会议']);
+    const localHit = textMessage({ content: JSON.stringify({ text: '智能纪要 https://bytedance.feishu.cn/docx/DocToken1234567890AbCd' }) });
+    await expect(evaluateMessageListenerWithDocumentTitles({
+      bot: documentTitleListener(), chatId: 'oc_chat', message: localHit, senderOpenId: 'ou_allowed', senderTypeRaw: 'user', explicitlyMentionedThisBot: false,
+    }, { resolveDocumentTitles })).resolves.toBeDefined();
+    await expect(evaluateMessageListenerWithDocumentTitles({
+      bot: documentTitleListener(), chatId: 'oc_chat', message: textMessage(), senderOpenId: 'ou_blocked', senderTypeRaw: 'user', explicitlyMentionedThisBot: false,
+    }, { resolveDocumentTitles })).resolves.toBeUndefined();
+    await expect(evaluateMessageListenerWithDocumentTitles({
+      bot: documentTitleListener(), chatId: 'oc_chat', message: textMessage(), senderOpenId: 'ou_allowed', senderTypeRaw: 'user', explicitlyMentionedThisBot: true,
+    }, { resolveDocumentTitles })).resolves.toBeUndefined();
+    expect(resolveDocumentTitles).not.toHaveBeenCalled();
+  });
+
+  it('keeps a document-title label out of matching keywords and falls back safely on failure', async () => {
+    const message = textMessage({ content: JSON.stringify({ text: 'https://bytedance.feishu.cn/docx/DocToken1234567890AbCd' }) });
+    await expect(evaluateMessageListenerWithDocumentTitles({
+      bot: documentTitleListener({ includeKeywords: ['文档'] }), chatId: 'oc_chat', message, senderOpenId: 'ou_allowed', senderTypeRaw: 'user', explicitlyMentionedThisBot: false,
+    }, { resolveDocumentTitles: async () => ['无关会议'] })).resolves.toBeUndefined();
+    await expect(evaluateMessageListenerWithDocumentTitles({
+      bot: documentTitleListener(), chatId: 'oc_chat', message, senderOpenId: 'ou_allowed', senderTypeRaw: 'user', explicitlyMentionedThisBot: false,
+    }, { resolveDocumentTitles: async () => { throw new Error('forbidden'); } })).resolves.toBeUndefined();
+  });
+
   it('matches a rich-post title and link label without inventing a document message type', () => {
     const state = bot({ globalMessageListener: {
       enabled: true, prompt: 'listener',

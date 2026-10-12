@@ -334,7 +334,10 @@ export function evaluateMessageListener(input: {
   };
 }
 
-export async function evaluateMessageListenerWithDocumentTitles(input: Parameters<typeof evaluateMessageListener>[0]): Promise<MessageListenerMatch | undefined> {
+export async function evaluateMessageListenerWithDocumentTitles(
+  input: Parameters<typeof evaluateMessageListener>[0],
+  deps: { resolveDocumentTitles?: (larkAppId: string, text: string) => Promise<string[]> } = {},
+): Promise<MessageListenerMatch | undefined> {
   const listener = findMessageListenerForChat(input.bot, input.chatId);
   const policy = listener?.contentPolicy;
   const localText = input.messageTextOverride ?? extractListenerMessageText(input.message);
@@ -354,9 +357,21 @@ export async function evaluateMessageListenerWithDocumentTitles(input: Parameter
     },
   };
   if (!evaluateMessageListener({ ...input, bot: candidateBot, messageTextOverride: localText })) return undefined;
-  const titles = await resolveListenerDocumentTitles(input.bot.config.larkAppId, localText);
-  const observedText = [...new Set([localText, ...titles.map(title => `文档标题：${title}`)])].filter(Boolean).join('\n');
-  return evaluateMessageListener({ ...input, messageTextOverride: observedText });
+  let titles: string[];
+  try {
+    titles = await (deps.resolveDocumentTitles ?? resolveListenerDocumentTitles)(input.bot.config.larkAppId, localText);
+  } catch {
+    // The production resolver already degrades per-link, but retain this
+    // boundary so an adapter failure cannot escape the daemon event path.
+    return evaluateMessageListener(input);
+  }
+  // Prefixes help the Agent explain why it woke, but they are not source text
+  // and must never themselves satisfy a user keyword such as “文档” or “标题”.
+  const matchingText = [...new Set([localText, ...titles])].filter(Boolean).join('\n');
+  const match = evaluateMessageListener({ ...input, messageTextOverride: matchingText });
+  if (!match) return undefined;
+  match.messageText = [...new Set([localText, ...titles.map(title => `文档标题：${title}`)])].filter(Boolean).join('\n');
+  return match;
 }
 
 /** Raw sender fields as parsed from a message (realtime event or REST history). */

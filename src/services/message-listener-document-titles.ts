@@ -5,6 +5,7 @@ export interface ListenerDocumentLink { url: string; kind: 'docx' | 'wiki'; toke
 
 const MAX_DOCUMENT_LINKS_PER_MESSAGE = 5;
 const DOCUMENT_PATH = /^\/(docx|wiki)\/([A-Za-z0-9]+)(?:\/|$)/;
+const TRAILING_URL_PUNCTUATION = new Set(['.', ',', ';', ':', '!', '?', '。', '，', '；', '：', '！', '？', ')', ']', '}']);
 
 function trustedDocumentHost(hostname: string, brand: 'feishu' | 'lark'): boolean {
   const suffixes = brand === 'lark' ? ['larksuite.com', 'larkoffice.com'] : ['feishu.cn', 'larkoffice.com'];
@@ -17,16 +18,25 @@ export function extractListenerDocumentLinks(text: string, brand: 'feishu' | 'la
   const links: ListenerDocumentLink[] = [];
   const seen = new Set<string>();
   for (const raw of text.match(/https:\/\/[^\s<>'"）】]+/g) ?? []) {
-    let url: URL;
-    try { url = new URL(raw); } catch { continue; }
-    if (url.protocol !== 'https:' || url.username || url.password || url.port || !trustedDocumentHost(url.hostname, brand)) continue;
-    const match = url.pathname.match(DOCUMENT_PATH);
-    if (!match) continue;
+    // A URL can be rendered from post `a.text` as `label (URL)` or occur at
+    // the end of normal prose.  Trim only terminal punctuation; the parsed
+    // pathname still has to satisfy the strict document path/token grammar.
+    let candidate = raw;
+    let parsed: URL | undefined;
+    let match: RegExpMatchArray | null = null;
+    while (candidate) {
+      try { parsed = new URL(candidate); } catch { parsed = undefined; }
+      match = parsed?.pathname.match(DOCUMENT_PATH) ?? null;
+      if (parsed && match) break;
+      if (!TRAILING_URL_PUNCTUATION.has(candidate.at(-1) ?? '')) break;
+      candidate = candidate.slice(0, -1);
+    }
+    if (!parsed || !match || parsed.protocol !== 'https:' || parsed.username || parsed.password || parsed.port || !trustedDocumentHost(parsed.hostname, brand)) continue;
     const kind = match[1] as 'docx' | 'wiki';
     const token = match[2];
     if (seen.has(`${kind}:${token}`)) continue;
     seen.add(`${kind}:${token}`);
-    links.push({ url: url.toString(), kind, token });
+    links.push({ url: parsed.toString(), kind, token });
     if (links.length >= MAX_DOCUMENT_LINKS_PER_MESSAGE) break;
   }
   return links;

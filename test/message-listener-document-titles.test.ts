@@ -9,9 +9,16 @@ import { extractListenerDocumentLinks, resolveListenerDocumentTitles } from '../
 
 describe('listener document title resolution', () => {
   beforeEach(() => mocks.request.mockReset());
-  it('accepts only deduplicated trusted HTTPS docx/wiki URLs', () => {
-    expect(extractListenerDocumentLinks('https://bytedance.feishu.cn/docx/DocToken123 https://foo.larkoffice.com/wiki/WikiToken456 https://feishu.cn.evil.example/docx/EvilToken', 'feishu'))
-      .toEqual([expect.objectContaining({ kind: 'docx', token: 'DocToken123' }), expect.objectContaining({ kind: 'wiki', token: 'WikiToken456' })]);
+  it('accepts deduplicated trusted URLs through common trailing punctuation', () => {
+    const docx = 'DocToken1234567890AbCd';
+    const wiki = 'WikiToken1234567890AbCd';
+    expect(extractListenerDocumentLinks(
+      `（https://bytedance.feishu.cn/docx/${docx}）, https://bytedance.feishu.cn/docx/${docx}。 [wiki](https://foo.larkoffice.com/wiki/${wiki}) https://feishu.cn.evil.example/docx/EvilToken1234567890`,
+      'feishu',
+    )).toEqual([
+      expect.objectContaining({ kind: 'docx', token: docx }),
+      expect.objectContaining({ kind: 'wiki', token: wiki }),
+    ]);
   });
   it('uses the bot tenant API for docx metadata, never a user token', async () => {
     mocks.request.mockResolvedValueOnce({ data: { metas: [{ title: '智能纪要：测试会议' }] } });
