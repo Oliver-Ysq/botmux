@@ -56,6 +56,16 @@ describe('message listener evaluation', () => {
     }});
   }
 
+  function dashboardDefaultDocumentTitleListener(policy: Record<string, unknown> = {}) {
+    return bot({ globalMessageListener: {
+      enabled: true,
+      prompt: 'listener',
+      senderPolicy: { mode: 'include_only', includeSenderOpenIds: ['ou_allowed'], includeSenderTypes: ['user'] },
+      messagePolicy: { includeMsgTypes: ['text', 'post', 'image', 'interactive'], scope: 'top_level' },
+      contentPolicy: { includeKeywords: ['智能纪要'], resolveDocumentTitles: true, ...policy },
+    }});
+  }
+
   it('matches a custom post link when only its resolved document title contains the keyword', async () => {
     const resolveDocumentTitles = vi.fn(async () => ['智能纪要：测试会议']);
     const message = textMessage({
@@ -83,6 +93,30 @@ describe('message listener evaluation', () => {
     }, { resolveDocumentTitles })).resolves.toBeUndefined();
     await expect(evaluateMessageListenerWithDocumentTitles({
       bot: documentTitleListener(), chatId: 'oc_chat', message: interactiveMessage(), senderOpenId: 'ou_allowed', senderTypeRaw: 'user', explicitlyMentionedThisBot: false,
+    }, { resolveDocumentTitles })).resolves.toBeUndefined();
+    expect(resolveDocumentTitles).not.toHaveBeenCalled();
+  });
+
+  it('does not query document titles for card or image messages allowed by Dashboard defaults', async () => {
+    const resolveDocumentTitles = vi.fn(async () => ['智能纪要：测试会议']);
+    const card = interactiveMessage({
+      content: JSON.stringify({ title: '文档卡片', elements: [[{ tag: 'text', text: 'https://bytedance.feishu.cn/docx/DocToken1234567890AbCd' }]] }),
+    });
+    const image = textMessage({ message_type: 'image', content: JSON.stringify({ image_key: 'img_v3_demo' }) });
+    await expect(evaluateMessageListenerWithDocumentTitles({
+      bot: dashboardDefaultDocumentTitleListener(), chatId: 'oc_chat', message: card, senderOpenId: 'ou_allowed', senderTypeRaw: 'user', explicitlyMentionedThisBot: false,
+    }, { resolveDocumentTitles })).resolves.toBeUndefined();
+    await expect(evaluateMessageListenerWithDocumentTitles({
+      bot: dashboardDefaultDocumentTitleListener(), chatId: 'oc_chat', message: image, senderOpenId: 'ou_allowed', senderTypeRaw: 'user', explicitlyMentionedThisBot: false,
+    }, { resolveDocumentTitles })).resolves.toBeUndefined();
+    expect(resolveDocumentTitles).not.toHaveBeenCalled();
+  });
+
+  it('does not query document titles when the option is explicitly disabled', async () => {
+    const resolveDocumentTitles = vi.fn(async () => ['智能纪要：测试会议']);
+    const message = textMessage({ content: JSON.stringify({ text: 'https://bytedance.feishu.cn/docx/DocToken1234567890AbCd' }) });
+    await expect(evaluateMessageListenerWithDocumentTitles({
+      bot: documentTitleListener({ resolveDocumentTitles: false }), chatId: 'oc_chat', message, senderOpenId: 'ou_allowed', senderTypeRaw: 'user', explicitlyMentionedThisBot: false,
     }, { resolveDocumentTitles })).resolves.toBeUndefined();
     expect(resolveDocumentTitles).not.toHaveBeenCalled();
   });

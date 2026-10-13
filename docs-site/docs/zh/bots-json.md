@@ -354,7 +354,7 @@ Dashboard 的「Bot 配置 → 消息卡片 → 实时卡片按钮」提供同�
 
 文档链接不是独立的飞书消息类型：它通常存在于 `text` 正文或 `post` 富文本链接中。因此 Dashboard 的消息类型仍选择 `text` / `post`，需要按纯链接所指文档标题匹配时，再开启 `resolveDocumentTitles`。目前仅支持经域名与路径校验的 HTTPS `docx` / `wiki` 链接；不支持的链接不会产生网络请求。
 
-开启前，确认 Bot 应用已获得并发布最小读取权限：`drive:drive.metadata:readonly`（读取文档元数据标题）以及 `wiki:node:read` 或 `wiki:node:retrieve`（解析 Wiki 节点）。权限不足或应用未被授予目标文档访问权时，监听会安全降级为仅按原消息文本判断。
+开启前，确认 Bot 应用已获得并发布最小读取权限：`drive:drive.metadata:readonly`（读取文档元数据标题）以及 `wiki:node:read`（解析 Wiki 节点；也可使用 `wiki:wiki:readonly`）。权限不足或应用未被授予目标文档访问权时，监听会安全降级为仅按原消息文本判断。
 
 约定与边界（V1）:
 
